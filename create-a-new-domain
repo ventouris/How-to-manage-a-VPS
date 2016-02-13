@@ -1,0 +1,117 @@
+### Configure Nginx server blocks
+
+In Nginx, virtual hosts are called “server blocks”. Below you will set up a virtual host for your domain so that it can be viewed at http://yourdomain.com.
+
+**Create a directory for your domain:**
+
+```
+sudo mkdir -p /var/www/[yourdomain.com]/{public_html,logs}
+sudo chown -R [your username]:www-data /var/www/[yourdomain.com]/public_html
+sudo chmod -R 755 /var/www
+```
+
+**Create a “Hello world” index page:**
+
+```
+sudo nano /var/www/<yourdomain.com>/public_html/index.php
+```
+
+Add the following lines and save:
+
+```
+<html>
+    <head>
+        <title>Hello world</title>
+    </head>
+    <body>
+        <h1>Hello world!</h1>
+    </body>
+</html>
+```
+
+**Create an Nginx config file for your domain:**
+
+```
+sudo nano /etc/nginx/sites-available/<yourdomain.com>
+```
+
+Add the following lines and save:
+
+```
+server {
+    server_name <www.yourdomain.com>;
+
+    # Rewrite www to non-www
+    rewrite ^(.*) http://<yourdomain.com>$1 permanent;
+}
+
+server {
+    # Listening ports
+    listen 80;      ## listen for ipv4; this line is default and implied
+    listen [::]:80; ## listen for ipv6
+
+    # Make site accessible from domain
+    server_name <yourdomain.com>;
+
+    # Root directory
+    root /var/www/<yourdomain.com>/public_html;
+    index index.html index.htm index.php;
+
+    # Logs
+    access_log /var/www/<yourdomain.com>/logs/access.log;
+    error_log /var/www/<yourdomain.com>/logs/error.log;
+
+    # Includes
+    include global/restrictions.conf;
+}
+```
+
+**Create global/restrictions.conf:**
+
+```
+sudo mkdir /etc/nginx/global
+sudo nano /etc/nginx/global/restrictions.conf
+```
+
+Add the following lines and save:
+
+```
+# Global restrictions configuration file.
+# Designed to be included in any server {} block.&lt;/p&gt;
+location = /favicon.ico {
+    log_not_found off;
+    access_log off;
+}
+
+location = /robots.txt {
+    allow all;
+    log_not_found off;
+    access_log off;
+}
+
+# Deny all attempts to access hidden files such as .htaccess, .htpasswd, .DS_Store (Mac).
+# Keep logging the requests to parse later (or to pass to firewall utilities such as fail2ban)
+location ~ /\. {
+    deny all;
+}
+
+# Deny access to any files with a .php extension in the uploads directory
+# Works in sub-directory installs and also in multisite network
+# Keep logging the requests to parse later (or to pass to firewall utilities such as fail2ban)
+location ~* /(?:uploads|files)/.*\.php$ {
+    deny all;
+}
+```
+
+**Create a symbolic link for your domain’s config file from "/sites-available" to "/sites-enabled":**
+
+```
+sudo ln -s /etc/nginx/sites-available/<yourdomain.com> /etc/nginx/sites-enabled/<yourdomain.com>
+```
+
+**Reload php5-fpm and nginx:**
+
+```
+sudo service php5-fpm reload
+sudo service nginx reload
+```

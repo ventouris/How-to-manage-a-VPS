@@ -15,3 +15,4 @@ You are free to contribute with a pull request and suggest anything you feel wil
 * Install and configure a LAMP stack
 * Installing Git and using Github
 * Automatic Backups
+* Create a new domain
