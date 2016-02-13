@@ -1,0 +1,313 @@
+#Server Security
+
+**Create a new user:**
+
+```
+adduser <your username>
+```
+
+Add the user to the sudo group:
+
+```
+usermod -a -G sudo <your username>
+```
+
+**Configure SSH:**
+
+```
+nano /etc/ssh/sshd_config
+```
+
+Edit the following lines and save:
+
+```
+Port <your port number>
+Protocol 2
+PermitRootLogin no
+PermitEmptyPasswords no
+UseDNS no
+AllowUsers yourusername
+```
+
+You should choose a port number that is less than 1024, and not 22. 
+
+Restart SSH:
+
+```
+service ssh restart
+```
+
+Login as new user:
+
+```
+exit
+ssh -p <your port number> <your username>@<yourdomain.com>
+```
+
+**Update Ubuntu:**
+
+```
+sudo apt-get update && sudo apt-get upgrade --show-upgraded
+```
+
+If you get the error "resolvconf: Error: /etc/resolv.conf isn't a symlink, not doing anything" while updating, run the command below and reboot the VPS from the Linode Manager dashboard:
+
+```
+sudo dpkg-reconfigure resolvconf
+```
+
+**Enable automatic security updates:**
+
+```
+sudo apt-get install unattended-upgrades
+sudo nano /etc/apt/apt.conf.d/10periodic
+```
+
+Edit the following lines and save:
+
+```
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Download-Upgradeable-Packages "1";
+APT::Periodic::AutocleanInterval "7";
+APT::Periodic::Unattended-Upgrade "1";
+```
+```
+sudo nano /etc/apt/apt.conf.d/50unattended-upgrades
+```
+
+Edit the following lines and save:
+
+```
+Unattended-Upgrade::Allowed-Origins {
+    "Ubuntu lucid-security";
+    //"Ubuntu lucid-updates";
+};
+```
+
+**Generate SSH keys on your local machine for passwordless login:**
+
+```
+ssh-keygen -t rsa -C "Your comment"
+```
+
+Secure copy the public key from your local machine to the VPS:
+
+On the VPS, run:
+
+```
+sudo mkdir -p ~/.ssh/authorized_keys
+sudo chown -R <your username>:<your username> .ssh
+```
+
+On your local machine, run:
+
+```
+scp -P <your port number> ~/.ssh/id_rsa.pub <your username>@<yourdomain.com>:
+```
+On the VPS, run:
+
+```
+cat ~/id_rsa.pub >> ~/.ssh/authorized_keys
+sudo chmod 700 .ssh
+sudo chmod 600 .ssh/authorized_keys
+sudo rm ~/id_rsa.pub
+exit
+ssh -p <your port number> <your username>@<yourdomain.com>
+```
+
+**Configure firewall with ufw:**
+
+```
+sudo apt-get install nmap
+nmap -v -sT localhost
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw logging on
+sudo ufw allow ssh/tcp
+sudo ufw allow http/tcp
+sudo ufw allow 443
+sudo ufw allow <your port number>
+sudo ufw enable
+sudo ufw status
+```
+
+**Get an email anytime a user uses sudo:**
+
+Create a new file for the sudo settings:
+
+```
+sudo nano /etc/sudoers.d/my_sudoers
+```
+
+Add this to the file:
+
+```
+Defaults    mail_always
+Defaults    mailto="feross@feross.org"
+```
+
+Set permissions on the file:
+
+```
+sudo chmod 0440 /etc/sudoers.d/my_sudoers
+```
+
+Install an MTA server (e.g. sendmail):
+
+```
+sudo aptitude install sendmail
+```
+
+
+**Secure shared memory:**
+
+```
+sudo nano /etc/fstab
+```
+
+Add the following line and save:
+
+```
+tmpfs /dev/shm tmpfs defaults,noexec,nosuid 0 0
+```
+
+Mount it:
+
+```
+sudo mount -a
+```
+
+**Install Fail2Ban:**
+
+```
+sudo apt-get install fail2ban
+sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+sudo nano /etc/fail2ban/jail.local
+```
+
+Edit the following lines and save:
+
+```
+destemail = <you@youremail.com>
+action = %(action_mwl)s
+
+[ssh]
+
+enabled  = true
+port     = <your port number>
+filter   = sshd
+logpath  = /var/log/auth.log
+maxretry = 6
+
+[ssh-ddos]
+
+enabled  = true
+port     = <your port number>
+filter   = sshd-ddos
+logpath  = /var/log/auth.log
+maxretry = 6
+```
+
+Restart Fail2Ban:
+
+```
+sudo service fail2ban restart
+```
+
+**Harden network with sysctl settings:**
+
+```
+sudo nano /etc/sysctl.conf
+```
+
+Edit the file and save:
+
+```
+#IP Spoofing protection
+
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
+
+#Ignore ICMP broadcast requests
+
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+
+#Disable source packet routing
+
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv6.conf.all.accept_source_route = 0
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv6.conf.default.accept_source_route = 0
+
+#Ignore send redirects
+
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+
+#Block SYN attacks
+
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_max_syn_backlog = 2048
+net.ipv4.tcp_synack_retries = 2
+net.ipv4.tcp_syn_retries = 5
+
+#Log Martians
+
+net.ipv4.conf.all.log_martians = 1
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+
+#Ignore ICMP redirects
+
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv6.conf.all.accept_redirects = 0
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv6.conf.default.accept_redirects = 0
+
+#Ignore Directed pings
+
+net.ipv4.icmp_echo_ignore_all = 1
+```
+
+Apply new settings:
+
+```
+sudo sysctl -p
+```
+
+**Prevent IP Spoofing:**
+
+```
+sudo nano /etc/host.conf
+```
+
+Add the following lines and save:
+
+```
+order bind,hosts
+nospoof on```
+
+**Check for rootkits with RKHunter and CHKRootKit:**
+
+```
+sudo apt-get install rkhunter chkrootkit
+sudo chkrootkit
+sudo rkhunter --update
+sudo rkhunter --propupd
+sudo rkhunter --check
+```
+
+**Analyze system log files with LogWatch:**
+
+```
+sudo apt-get install logwatch libdate-manip-perl
+sudo logwatch | less
+sudo logwatch --mailto <your email address> --output mail --format html --range 'between -7 days and today'
+```
+
+**Audit system security with Tiger:**
+
+```
+sudo apt-get install tiger
+sudo tiger
+sudo less /var/log/tiger/security.report.*
+```
