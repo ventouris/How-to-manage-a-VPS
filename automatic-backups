@@ -1,0 +1,34 @@
+#Automatic Backups
+
+###Backup your MySQL databases
+
+
+Install automysqlbackup to get backups:
+
+```
+sudo aptitude install automysqlbackup
+```
+
+Open the configuration file:
+
+```
+sudo nano /etc/default/automysqlbackup
+```
+
+Find the line that begins with `BACKUPDIR=` and change it to `BACKUPDIR="/home/<your username>/backups/"`
+
+Set automatic emails if something goes wrong by finding the line `MAILADDR=` and changing it to `MAILADDR="<your email address>".`
+
+### Setup Automatic Backups
+
+Open your crontab:
+
+```
+crontab -e
+```
+
+Add this line to the file:
+
+```
+@weekly rsync -r -a -e "ssh -l <your username on backup server> -p <ssh port number of backup server>" --delete /home/<your username> <hostname or ip address of backup server>:/path/to/some/directory/on/backup/server
+```
