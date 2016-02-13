@@ -1,0 +1,13 @@
+## The First Steps on the ServerOpen a terminal and connect to the VPS:
+```
+ssh root@<your IP address>
+```Set your hostname by changing the `"your hostname"` with another name, verify that it works and reconnect to the VPS on Linode:
+```
+echo "your hostname" > /etc/hostnamehostname -F /etc/hostnamehostname
+```Open the hosts file and set the fully qualified domain name (FQDN):
+```nano /etc/hosts
+```Include the following line and save (Ctrl + X) the file:
+
+```127.0.0.1 <your hostname>.<yourdomain.com> <yourhostname>
+```Set the language and time zone:```locale-gen en_US.UTF-8update-locale LANG=en_US.UTF-8dpkg-reconfigure tzdatadate
+```
