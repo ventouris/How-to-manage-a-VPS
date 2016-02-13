@@ -1,0 +1,11 @@
+# Server Stability
+
+There are many cases where your server runs out of memory and you could have several minutes of lost traffic. To ensure that the downtime will be on the minimum, we can set an automatical reboot of the server.
+
+Config the server to automatically reboot when it runs out of memory:
+
+```sudo nano /etc/sysctl.conf
+```
+Include the following lines and save:
+
+```vm.panic_on_oom=1kernel.panic=10```
