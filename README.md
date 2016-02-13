@@ -1,8 +1,6 @@
 # How to manage a VPS - The Linode Handbook
 
-Being a slave of Shared Hosting could be a pain in the ass for many of us. This is a chance to create an open source Handbook for new users on managing a VPS.
-
-You are free to contribute with a pull request and suggest anything you feel will improve the Handbook.
+You are free to contribute with a pull request and suggest anything you believe will improve the Handbook.
 
 ###Chapters
 
