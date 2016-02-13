@@ -1,0 +1,374 @@
+# Install and Configure a LEMP Stack
+
+**Add PPAs for Nginx and PHP, as Ubuntu’s defaults are quite outdated:**
+
+```
+sudo apt-get install python-software-properties
+sudo add-apt-repository ppa:nginx/stable
+sudo add-apt-repository ppa:ondrej/php5
+sudo apt-get update
+```
+
+**Install Nginx, MySQL, PHP, and all dependencies:**
+
+```
+sudo apt-get install mysql-server nginx php5 php5-fpm php5-cli php5-mysql php5-curl php5-gd php5-intl php-pear php5-imagick php5-imap php5-mcrypt php5-memcache php5-ming php5-ps php5-pspell php5-recode php5-snmp php5-sqlite php5-tidy php5-xmlrpc php5-xsl php5-xcache
+```
+
+**Install Nginx Cache Purge and Add Headers:**
+
+???
+
+**Start Nginx, php5-fpm, and MySQL:**
+
+```
+sudo apt-cache search php5 | grep php5
+sudo service nginx start
+sudo service php5-fpm start
+sudo start mysql
+ifconfig eth0 | grep inet | awk '{ print $2 }'
+```
+
+**Install a compiler:**
+
+A compiler is often required to install Python packages and other software, so let’s just install one up-front.
+
+```
+sudo aptitude install build-essential
+```
+
+###Configure Nginx
+
+
+**Create new file for basic settings and save as `something.custom`:**
+
+```
+worker_processes 6;
+sendfile on;
+tcp_nopush on;
+tcp_nodelay on;
+keepalive_timeout 10s;
+types_hash_max_size 2048;
+server_names_hash_bucket_size 64;
+include /etc/nginx/mime.types;
+default_type applicaiton/octet-stream;
+```
+
+**Create new file for basic compression settings and save as `somethingelse.custom`:**
+
+```
+gzip on;
+gzip__vary on;
+gzip_proxied any;
+gzip_comp_level 9;
+gzip_buffers 16 8k;
+gzip_http_version 1.1;
+gzip_types text/plain text/css application/json 
+applicationx-javascript text/xml application/xml 
+application/xml+rss text/javascript;
+```
+
+**Modify the nginx.conf file:**
+
+```
+sudo nano /etc/nginx/nginx.conf
+```
+
+Add the following lines:
+
+```
+include /etc/nginx/*.custom
+```
+
+**Caching in Nginx on config**
+
+```
+location ~* .(ico|jpg|webp|jpeg|gif|css|png|js|ico|bmp|zip|woff)$ {
+access_log off;
+log_not_found off;
+add_header Pragma public;
+add_header Cache-Control "public";
+expires 14d;
+
+location ~* .(php|html)$ {
+access_log off;
+log_not_found off;
+add_header Pragma public;
+add_header Cache-Control "public";
+expires 14d;
+```
+
+**Fast-CGI Caching**
+
+Go back to your basic settings Nginx config file and add the following lines:
+
+```
+fastcgi_cache_path /dev/shm/nginx levels=1:2 
+keys_zone=stupidfast:16m 
+max_size=1024m inactive=60m;
+
+fastcgi_pass_header Set-Cookie;
+fastcgi_pass_header Cookie;
+fastcgi_ignore_headers Cache-Control Expires Set-Cookie;
+fastcgi_index index.php;
+fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+fastcgi_split_path_info ^(.+.php)(/.+)$;
+fastcgi_param  PATH_INFO $fastcgi_path_info;
+fastcgi_param  PATH_TRANSLATED    $document_root$fastcgi_path_info;
+fastcgi_intercept_errors on;
+include fastcgi_params;
+
+
+#This covers caching bypasses:
+
+fastcgi_no_cache $no_cache;
+fastcgi_cache_bypass $no_cache;
+fastcgi_cache drm_custom_cache;
+fastcgi_cache_key $server_name|$request_uri; 
+
+
+#Expiration and sizes:
+
+fastcgi_cache_valid 404 60m;
+fastcgi_cache_valid 200 60m;
+fastcgi_max_temp_file_size 4m;
+fastcgi_cache_use_stale updating;
+
+#Tell the cache to send requests backward into PHP if there’s no cache entry:
+
+fastcgi_pass localhost:9000;
+```
+
+**PHP Opcaching**
+
+To-do: apt-get the php5-opcache
+
+**In-memory Caching**
+
+To-do: Ubuntu it’s under /var/run/. Go and cache there.
+
+**If you have Wordpress add the following in wp-config.php to purge Nginx's Cache when you do updates on Wordpress**
+
+
+```
+define('RT_WP_NGINX_HELPER_CACHE_PATH','/dev/shm/nginx/');
+}
+```
+
+**Make a backup copy of Nginx’s “default” file and modify the original:**
+
+```
+sudo cp /etc/nginx/sites-available/default /etc/nginx/sites-available/default.bak
+sudo nano /etc/nginx/sites-available/default
+```
+
+Edit the following lines and save:
+
+```
+server {
+    listen   80; ## listen for ipv4; this line is default and implied
+    listen   [::]:80 default ipv6only=on; ## listen for ipv6
+
+    root /usr/share/nginx/html;
+    index index.html index.htm index.php;
+
+    # Make site accessible from http://localhost/
+    server_name _;
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /doc/ {
+        alias /usr/share/doc/;
+        autoindex on;
+        allow 127.0.0.1;
+        deny all;
+    }
+
+    # Redirect server error pages to the static page /50x.html
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/html;
+    }
+
+    # Pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
+    location ~ \.php$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass unix:/tmp/php5-fpm.sock;
+        fastcgi_index index.php;
+        include fastcgi_params;
+    }
+
+    # Deny access to .htaccess files, if Apache's document root concurs
+    # with Nginx’s one
+    location ~ /\.ht {
+        deny all;
+    }
+}
+```
+
+### Configure php5-fpm
+
+**Modify the php.ini file:**
+
+```
+sudo nano /etc/php5/fpm/php.ini
+```
+
+Edit the following line and save:
+
+```
+cgi.fix_pathinfo = 0
+```
+
+**Modify the www.conf file:**
+
+```
+sudo nano /etc/php5/fpm/pool.d/www.conf
+```
+
+Edit the following line and save:
+
+```
+listen = /tmp/php5-fpm.sock
+```
+
+**Reload php5-fpm and nginx:**
+
+```
+sudo service php5-fpm reload
+sudo service nginx reload
+```
+
+**Create info.php:**
+
+```
+sudo nano /usr/share/nginx/html/info.php
+```
+
+Add the following line and save:
+
+```
+<?php phpinfo(); ?>
+```
+
+Visit http://youripaddress/info.php in a web browser.
+
+
+### Configure Nginx server blocks
+
+In Nginx, virtual hosts are called “server blocks”. Below you will set up a virtual host for your domain so that it can be viewed at http://yourdomain.com.
+
+**Create a directory for your domain:**
+
+```
+sudo mkdir -p /var/www/[yourdomain.com]/{public_html,logs}
+sudo chown -R [your username]:www-data /var/www/[yourdomain.com]/public_html
+sudo chmod -R 755 /var/www
+```
+
+**Create a “Hello world” index page:**
+
+```
+sudo nano /var/www/<yourdomain.com>/public_html/index.php
+```
+
+Add the following lines and save:
+
+```
+<html>
+    <head>
+        <title>Hello world</title>
+    </head>
+    <body>
+        <h1>Hello world!</h1>
+    </body>
+</html>
+```
+
+**Create an Nginx config file for your domain:**
+
+```
+sudo nano /etc/nginx/sites-available/<yourdomain.com>
+```
+
+Add the following lines and save:
+
+```
+server {
+    server_name <www.yourdomain.com>;
+
+    # Rewrite www to non-www
+    rewrite ^(.*) http://<yourdomain.com>$1 permanent;
+}
+
+server {
+    # Listening ports
+    listen 80;      ## listen for ipv4; this line is default and implied
+    listen [::]:80; ## listen for ipv6
+
+    # Make site accessible from domain
+    server_name <yourdomain.com>;
+
+    # Root directory
+    root /var/www/<yourdomain.com>/public_html;
+    index index.html index.htm index.php;
+
+    # Logs
+    access_log /var/www/<yourdomain.com>/logs/access.log;
+    error_log /var/www/<yourdomain.com>/logs/error.log;
+
+    # Includes
+    include global/restrictions.conf;
+}
+```
+
+**Create global/restrictions.conf:**
+
+```
+sudo mkdir /etc/nginx/global
+sudo nano /etc/nginx/global/restrictions.conf
+```
+
+Add the following lines and save:
+
+```
+# Global restrictions configuration file.
+# Designed to be included in any server {} block.&lt;/p&gt;
+location = /favicon.ico {
+    log_not_found off;
+    access_log off;
+}
+
+location = /robots.txt {
+    allow all;
+    log_not_found off;
+    access_log off;
+}
+
+# Deny all attempts to access hidden files such as .htaccess, .htpasswd, .DS_Store (Mac).
+# Keep logging the requests to parse later (or to pass to firewall utilities such as fail2ban)
+location ~ /\. {
+    deny all;
+}
+
+# Deny access to any files with a .php extension in the uploads directory
+# Works in sub-directory installs and also in multisite network
+# Keep logging the requests to parse later (or to pass to firewall utilities such as fail2ban)
+location ~* /(?:uploads|files)/.*\.php$ {
+    deny all;
+}
+```
+
+**Create a symbolic link for your domain’s config file from "/sites-available" to "/sites-enabled":**
+
+```
+sudo ln -s /etc/nginx/sites-available/<yourdomain.com> /etc/nginx/sites-enabled/<yourdomain.com>
+```
+
+**Reload php5-fpm and nginx:**
+
+```
+sudo service php5-fpm reload
+sudo service nginx reload
+```

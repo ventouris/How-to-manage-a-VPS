@@ -311,3 +311,50 @@ sudo apt-get install tiger
 sudo tiger
 sudo less /var/log/tiger/security.report.*
 ```
+
+**When you install Nginx do the following:**
+
+Edit basic Nginx config and add the following lines:
+
+```
+set $no_cache "";
+if ($request_method = POST)
+{
+    set $no_cache 1;
+}
+if ($request_uri ~* "/(wp-admin/|wp-login.php)") 
+{
+    set $no_cache 1;
+}
+if ($http_cookie ~* "wordpress_logged_in_")
+{
+    set $no_cache 1;
+}
+```
+
+Users can’t browse certain files:
+
+```
+location ~ /(.|wp-config.php|readme.html|licence.txt) {
+    return 404;
+}
+
+location ~ /. {
+deny all;
+}
+```
+
+Allow only three methods:
+
+```
+if ($request_method !~ ^(GET|POST|HEAD)$ ) {
+return 444;
+}
+```
+
+Avoid a bit of information disclosure:
+
+```
+server_tokens off;
+server_name_in_redirect off;
+```
