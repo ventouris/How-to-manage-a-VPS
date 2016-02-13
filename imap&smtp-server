@@ -1,0 +1,63 @@
+# IMAP & SMTP Server
+
+If you want to set up cron jobs or would like error and log reports emailed to you, do the following.
+
+**Install Postfix and its dependencies:**
+
+```
+sudo apt-get install postfix libsasl2-2 ca-certificates libsasl2-modules
+```
+
+Edit main.cf:
+
+```
+sudo nano /etc/postfix/main.cf
+```
+
+Add the following lines and save:
+
+```
+# sets gmail as relay
+relayhost = [smtp.gmail.com]:587
+
+# use tls
+smtp_use_tls=yes
+
+# use sasl when authenticating to foreign SMTP servers
+smtp_sasl_auth_enable = yes
+
+# path to password map file
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+
+# list of CAs to trust when verifying server certificate
+smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
+
+# eliminates default security options which are imcompatible with gmail
+smtp_sasl_security_options =
+```
+
+Edit sasl_passwd:
+
+```
+sudo nano /etc/postfix/sasl_passwd
+```
+
+Add the following line and save:
+
+```
+[smtp.gmail.com]:587  <your gmail username>:<your gmail password>
+```
+
+Chown sasl_passwd:
+
+```
+sudo postmap /etc/postfix/sasl_passwd
+sudo chown postfix /etc/postfix/sasl_passwd*
+```
+
+Reload Postfix and send a test email:
+
+```
+sudo service postfix reload
+sendmail <test email address> This email worked! .
+```
