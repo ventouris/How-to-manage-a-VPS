@@ -2,6 +2,8 @@
 
 You are free to contribute with a pull request and suggest anything you believe will improve the Handbook.
 
+You can also use the slack team for discussion [https://linodehandbook.slack.com]()
+
 ###Chapters
 
 * Getting Started
